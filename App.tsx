@@ -1,80 +1,102 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { StoreProvider, useStore } from './src/store';
-import { DrawScreen } from './src/screens/DrawScreen';
-import { DeckScreen } from './src/screens/DeckScreen';
-import { HistoryScreen } from './src/screens/HistoryScreen';
-import { colors } from './src/theme';
+import * as Haptics from 'expo-haptics';
+import { Card, drawCard } from './src/cards';
+import { Timer } from './src/Timer';
 
-type Tab = 'draw' | 'deck' | 'history';
-
-const TABS: { key: Tab; label: string; icon: string }[] = [
-  { key: 'draw', label: 'Draw', icon: '🎁' },
-  { key: 'deck', label: 'The Hat', icon: '🎩' },
-  { key: 'history', label: 'History', icon: '🕒' },
-];
-
-function Shell() {
-  const { ready } = useStore();
-  const [tab, setTab] = useState<Tab>('draw');
-
-  if (!ready) {
-    return (
-      <View style={styles.loading}>
-        <Text style={styles.loadingText}>Shuffling the hat…</Text>
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.root}>
-      <View style={styles.body}>
-        {tab === 'draw' && <DrawScreen />}
-        {tab === 'deck' && <DeckScreen />}
-        {tab === 'history' && <HistoryScreen />}
-      </View>
-      <View style={styles.tabBar}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <Pressable key={t.key} onPress={() => setTab(t.key)} style={styles.tab}>
-              <Text style={styles.tabIcon}>{t.icon}</Text>
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </SafeAreaView>
-  );
-}
+type Phase = 'idle' | 'drawing' | 'revealed' | 'timer';
 
 export default function App() {
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [card, setCard] = useState<Card | null>(null);
+  const fade = useRef(new Animated.Value(1)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+
+  const draw = () => {
+    if (phase === 'drawing') return;
+    setPhase('drawing');
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    spin.setValue(0);
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCard((prev) => drawCard(prev));
+      setPhase('revealed');
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    });
+  };
+
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] });
+
   return (
     <SafeAreaProvider>
-      <StoreProvider>
-        <StatusBar style="light" />
-        <Shell />
-      </StoreProvider>
+      <StatusBar style="dark" />
+      <SafeAreaView style={styles.root}>
+        {phase === 'timer' ? (
+          <Timer onClose={() => setPhase('idle')} />
+        ) : (
+          <View style={styles.center}>
+            <Animated.View style={[styles.content, { opacity: fade }]}>
+              {phase === 'revealed' && card ? (
+                <>
+                  <Text style={styles.kicker}>{card.type === 'up' ? 'Power-up' : 'Power-down'}</Text>
+                  <Text style={styles.cardText}>{card.text}</Text>
+                </>
+              ) : (
+                <Text style={styles.title}>Mystery Box</Text>
+              )}
+            </Animated.View>
+
+            <View style={styles.actions}>
+              {phase === 'revealed' ? (
+                <>
+                  <Pressable style={styles.primary} onPress={() => setPhase('timer')}>
+                    <Text style={styles.primaryText}>Start timer</Text>
+                  </Pressable>
+                  <Pressable onPress={draw}>
+                    <Text style={styles.link}>Draw again</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable style={styles.primary} onPress={draw} disabled={phase === 'drawing'}>
+                  <Animated.Text style={[styles.primaryText, { transform: [{ rotate }] }]}>
+                    {phase === 'drawing' ? '◌' : 'Draw'}
+                  </Animated.Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  body: { flex: 1 },
-  loading: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { color: colors.textMuted },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingBottom: 6,
+  root: { flex: 1, backgroundColor: '#fff', justifyContent: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 48 },
+  content: { alignItems: 'center', minHeight: 160, justifyContent: 'center' },
+  title: { fontSize: 22, color: '#111', letterSpacing: 2, textTransform: 'uppercase', fontWeight: '300' },
+  kicker: { fontSize: 13, color: '#888', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
+  cardText: { fontSize: 36, color: '#111', fontWeight: '600', textAlign: 'center', lineHeight: 44 },
+  actions: { alignItems: 'center', gap: 22 },
+  primary: {
+    backgroundColor: '#111',
+    paddingHorizontal: 44,
+    paddingVertical: 18,
+    borderRadius: 999,
+    minWidth: 180,
+    alignItems: 'center',
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 2 },
-  tabIcon: { fontSize: 20 },
-  tabLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
-  tabLabelActive: { color: colors.accent },
+  primaryText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  link: { color: '#111', fontSize: 16, textDecorationLine: 'underline' },
 });
