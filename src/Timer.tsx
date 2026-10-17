@@ -66,6 +66,7 @@ export function Timer({ onClose }: { onClose: () => void }) {
       <View style={styles.row}>
         <Pressable
           onPress={() => {
+            endAt.current = Date.now() + duration * 1000;
             setRemaining(duration);
             setRunning(true);
           }}
