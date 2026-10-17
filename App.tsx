@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { Card, DEFAULT_CARDS, Mode, drawCard, loadCards, saveCards } from './src/cards';
 import { CardsScreen } from './src/CardsScreen';
+import { isUri, playSound } from './src/media';
 import { Timer } from './src/Timer';
 
 type Phase = 'idle' | 'drawing' | 'revealed' | 'timer' | 'cards';
@@ -54,7 +55,9 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setCard((prev) => drawCard(cardsRef.current, prev, mode));
+      const next = drawCard(cardsRef.current, card, mode);
+      setCard(next);
+      if (next) playSound(next.sound);
       setPhase('revealed');
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
@@ -89,6 +92,11 @@ export default function App() {
             <Animated.View style={[styles.content, { opacity: fade }]}>
               {phase === 'revealed' && card ? (
                 <>
+                  {isUri(card.image) ? (
+                    <Image source={{ uri: card.image }} style={styles.picture} />
+                  ) : card.image ? (
+                    <Text style={styles.bigEmoji}>{card.image}</Text>
+                  ) : null}
                   <Text style={styles.kicker}>{card.type === 'up' ? 'Power-up' : 'Power-down'}</Text>
                   <Text style={styles.cardText}>{card.text}</Text>
                 </>
@@ -133,6 +141,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 48 },
   content: { alignItems: 'center', minHeight: 160, justifyContent: 'center' },
   title: { fontSize: 22, color: '#111', letterSpacing: 2, textTransform: 'uppercase', fontWeight: '300' },
+  picture: { width: 140, height: 140, borderRadius: 16, marginBottom: 20 },
+  bigEmoji: { fontSize: 96, marginBottom: 12 },
   kicker: { fontSize: 13, color: '#888', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
   cardText: { fontSize: 36, color: '#111', fontWeight: '600', textAlign: 'center', lineHeight: 44 },
   actions: { alignItems: 'center', gap: 22 },

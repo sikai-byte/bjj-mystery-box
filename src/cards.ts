@@ -2,31 +2,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type CardType = 'up' | 'down';
 
-export type Card = { id: string; type: CardType; text: string };
+export type Card = { id: string; type: CardType; text: string; image: string; sound: string };
 
 export type Mode = 'up' | 'mix' | 'down';
 
-const POSITIONS: [up: string, down: string][] = [
-  ['Start with a double leg', 'Partner starts with a double leg'],
-  ['Start with a single leg', 'Partner starts with a single leg'],
-  ['Start with a triangle', 'Partner starts with a triangle'],
-  ['Start with an armbar', 'Partner starts with an armbar'],
-  ['Start with a guillotine', 'Partner starts with a guillotine'],
-  ['Start on the back', 'Partner starts on your back'],
-  ['Start up 2 points', 'Start down 2 points'],
-  ['Start with a kimura grip', 'Partner starts with a kimura grip'],
-  ['Start in single leg X', 'Partner starts in single leg X'],
-  ['Start in side control', 'Start under side control'],
-  ['Start on mount', 'Start under mount'],
-  ['Start in your guard', "Start in partner's guard"],
+const POSITIONS: [up: string, down: string, emoji: string][] = [
+  ['Start with a double leg', 'Partner starts with a double leg', '🦵'],
+  ['Start with a single leg', 'Partner starts with a single leg', '🦿'],
+  ['Start with a triangle', 'Partner starts with a triangle', '🔺'],
+  ['Start with an armbar', 'Partner starts with an armbar', '💪'],
+  ['Start with a guillotine', 'Partner starts with a guillotine', '🪢'],
+  ['Start on the back', 'Partner starts on your back', '🎒'],
+  ['Start up 2 points', 'Start down 2 points', '🏆'],
+  ['Start with a kimura grip', 'Partner starts with a kimura grip', '🔒'],
+  ['Start in single leg X', 'Partner starts in single leg X', '❌'],
+  ['Start in side control', 'Start under side control', '🛏️'],
+  ['Start on mount', 'Start under mount', '🏔️'],
+  ['Start in your guard', "Start in partner's guard", '🛡️'],
 ];
 
-export const DEFAULT_CARDS: Card[] = POSITIONS.flatMap(([up, down], i) => [
-  { id: `up-${i}`, type: 'up', text: up },
-  { id: `down-${i}`, type: 'down', text: down },
+export const DEFAULT_CARDS: Card[] = POSITIONS.flatMap(([up, down, emoji], i) => [
+  { id: `up-${i}`, type: 'up', text: up, image: emoji, sound: 'airhorn' },
+  { id: `down-${i}`, type: 'down', text: down, image: emoji, sound: 'trombone' },
 ]);
 
-const KEY = 'mystery-box:cards:v1';
+export const newCard = (type: CardType): Card => ({
+  id: newId(),
+  type,
+  text: '',
+  image: '🎲',
+  sound: type === 'up' ? 'airhorn' : 'trombone',
+});
+
+const KEY = 'mystery-box:cards:v2';
 
 export async function loadCards(): Promise<Card[]> {
   try {

@@ -1,6 +1,9 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Card, CardType, DEFAULT_CARDS, newId } from './cards';
+import React, { useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { Card, CardType, DEFAULT_CARDS, newCard } from './cards';
+import { EMOJIS, SOUNDS, isUri, playSound, soundLabel, toPersistentUri } from './media';
 
 type Props = {
   cards: Card[];
@@ -9,31 +12,110 @@ type Props = {
 };
 
 export function CardsScreen({ cards, onChange, onClose }: Props) {
-  const update = (id: string, text: string) =>
-    onChange(cards.map((c) => (c.id === id ? { ...c, text } : c)));
+  const [open, setOpen] = useState<string | null>(null);
+
+  const patch = (id: string, p: Partial<Card>) =>
+    onChange(cards.map((c) => (c.id === id ? { ...c, ...p } : c)));
   const remove = (id: string) => onChange(cards.filter((c) => c.id !== id));
-  const add = (type: CardType) => onChange([...cards, { id: newId(), type, text: '' }]);
+
+  const pickImage = async (id: string) => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (res.canceled) return;
+    const a = res.assets[0];
+    patch(id, { image: a.base64 ? `data:${a.mimeType ?? 'image/jpeg'};base64,${a.base64}` : a.uri });
+  };
+
+  const pickSound = async (id: string) => {
+    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
+    if (res.canceled) return;
+    const uri = await toPersistentUri(res.assets[0].uri);
+    patch(id, { sound: uri });
+    playSound(uri);
+  };
+
+  const row = (c: Card) => {
+    const expanded = open === c.id;
+    return (
+      <View key={c.id} style={styles.card}>
+        <View style={styles.row}>
+          <Pressable onPress={() => setOpen(expanded ? null : c.id)} hitSlop={6}>
+            {isUri(c.image) ? (
+              <Image source={{ uri: c.image }} style={styles.thumb} />
+            ) : (
+              <Text style={styles.emoji}>{c.image || '·'}</Text>
+            )}
+          </Pressable>
+          <TextInput
+            value={c.text}
+            onChangeText={(t) => patch(c.id, { text: t })}
+            placeholder="New card"
+            placeholderTextColor="#aaa"
+            style={styles.input}
+          />
+          <Pressable onPress={() => remove(c.id)} hitSlop={10} accessibilityLabel="Remove card">
+            <Text style={styles.remove}>×</Text>
+          </Pressable>
+        </View>
+        <Pressable onPress={() => setOpen(expanded ? null : c.id)}>
+          <Text style={styles.meta}>
+            {soundLabel(c.sound)} · {expanded ? 'close' : 'edit picture & sound'}
+          </Text>
+        </Pressable>
+        {expanded && (
+          <View style={styles.editor}>
+            <Text style={styles.label}>Picture</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {EMOJIS.map((e) => (
+                <Pressable
+                  key={e}
+                  onPress={() => patch(c.id, { image: e })}
+                  style={[styles.chip, c.image === e && styles.chipActive]}
+                >
+                  <Text style={styles.chipEmoji}>{e}</Text>
+                </Pressable>
+              ))}
+              <Pressable onPress={() => void pickImage(c.id)} style={[styles.chip, isUri(c.image) && styles.chipActive]}>
+                <Text style={[styles.chipText, isUri(c.image) && styles.chipTextActive]}>Upload…</Text>
+              </Pressable>
+            </ScrollView>
+            <Text style={styles.label}>Sound</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {Object.entries(SOUNDS).map(([key, s]) => (
+                <Pressable
+                  key={key}
+                  onPress={() => {
+                    patch(c.id, { sound: key });
+                    playSound(key);
+                  }}
+                  style={[styles.chip, c.sound === key && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, c.sound === key && styles.chipTextActive]}>{s.label}</Text>
+                </Pressable>
+              ))}
+              <Pressable onPress={() => void pickSound(c.id)} style={[styles.chip, isUri(c.sound) && styles.chipActive]}>
+                <Text style={[styles.chipText, isUri(c.sound) && styles.chipTextActive]}>Upload…</Text>
+              </Pressable>
+              <Pressable onPress={() => patch(c.id, { sound: '' })} style={[styles.chip, !c.sound && styles.chipActive]}>
+                <Text style={[styles.chipText, !c.sound && styles.chipTextActive]}>None</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const section = (type: CardType, title: string) => (
     <View style={styles.section}>
       <Text style={styles.heading}>{title}</Text>
-      {cards
-        .filter((c) => c.type === type)
-        .map((c) => (
-          <View key={c.id} style={styles.row}>
-            <TextInput
-              value={c.text}
-              onChangeText={(t) => update(c.id, t)}
-              placeholder="New card"
-              placeholderTextColor="#aaa"
-              style={styles.input}
-            />
-            <Pressable onPress={() => remove(c.id)} hitSlop={10} accessibilityLabel="Remove card">
-              <Text style={styles.remove}>×</Text>
-            </Pressable>
-          </View>
-        ))}
-      <Pressable onPress={() => add(type)}>
+      {cards.filter((c) => c.type === type).map(row)}
+      <Pressable onPress={() => onChange([...cards, newCard(type)])}>
         <Text style={styles.link}>+ Add {title.toLowerCase().replace(/s$/, '')}</Text>
       </Pressable>
     </View>
@@ -69,9 +151,12 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, color: '#111', letterSpacing: 2, textTransform: 'uppercase' },
   list: { paddingHorizontal: 20, paddingBottom: 40, gap: 28 },
-  section: { gap: 10 },
+  section: { gap: 14 },
   heading: { fontSize: 13, color: '#888', letterSpacing: 2, textTransform: 'uppercase' },
+  card: { gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  emoji: { fontSize: 24, width: 32, textAlign: 'center' },
+  thumb: { width: 32, height: 32, borderRadius: 6 },
   input: {
     flex: 1,
     borderBottomWidth: 1,
@@ -81,5 +166,21 @@ const styles = StyleSheet.create({
     color: '#111',
   },
   remove: { fontSize: 22, color: '#888', paddingHorizontal: 4 },
+  meta: { fontSize: 12, color: '#888', marginLeft: 44 },
+  editor: { gap: 6, paddingVertical: 6 },
+  label: { fontSize: 11, color: '#888', letterSpacing: 1.5, textTransform: 'uppercase' },
+  chips: { flexDirection: 'row', gap: 8, paddingVertical: 2 },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    justifyContent: 'center',
+  },
+  chipActive: { backgroundColor: '#111', borderColor: '#111' },
+  chipEmoji: { fontSize: 18 },
+  chipText: { fontSize: 13, color: '#111' },
+  chipTextActive: { color: '#fff' },
   link: { color: '#111', fontSize: 16, textDecorationLine: 'underline' },
 });
