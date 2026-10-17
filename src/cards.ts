@@ -22,7 +22,10 @@ export const CARDS: Card[] = POSITIONS.flatMap(([up, down]) => [
   { type: 'down', text: down },
 ]);
 
-export function drawCard(previous: Card | null): Card {
-  const pool = previous ? CARDS.filter((c) => c.text !== previous.text) : CARDS;
+export type Mode = 'up' | 'mix' | 'down';
+
+export function drawCard(previous: Card | null, mode: Mode = 'mix'): Card {
+  const deck = mode === 'mix' ? CARDS : CARDS.filter((c) => c.type === mode);
+  const pool = deck.length > 1 && previous ? deck.filter((c) => c.text !== previous.text) : deck;
   return pool[Math.floor(Math.random() * pool.length)];
 }

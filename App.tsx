@@ -3,14 +3,21 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { Card, drawCard } from './src/cards';
+import { Card, Mode, drawCard } from './src/cards';
 import { Timer } from './src/Timer';
 
 type Phase = 'idle' | 'drawing' | 'revealed' | 'timer';
 
+const MODES: { key: Mode; label: string }[] = [
+  { key: 'up', label: 'Power-ups' },
+  { key: 'mix', label: 'Mix' },
+  { key: 'down', label: 'Power-downs' },
+];
+
 export default function App() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [card, setCard] = useState<Card | null>(null);
+  const [mode, setMode] = useState<Mode>('mix');
   const fade = useRef(new Animated.Value(1)).current;
   const spin = useRef(new Animated.Value(0)).current;
 
@@ -28,7 +35,7 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setCard((prev) => drawCard(prev));
+      setCard((prev) => drawCard(prev, mode));
       setPhase('revealed');
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
@@ -45,6 +52,19 @@ export default function App() {
           <Timer onClose={() => setPhase('idle')} />
         ) : (
           <View style={styles.center}>
+            <View style={styles.segmented}>
+              {MODES.map((m) => (
+                <Pressable
+                  key={m.key}
+                  onPress={() => setMode(m.key)}
+                  style={[styles.segment, mode === m.key && styles.segmentActive]}
+                >
+                  <Text style={[styles.segmentText, mode === m.key && styles.segmentTextActive]}>
+                    {m.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <Animated.View style={[styles.content, { opacity: fade }]}>
               {phase === 'revealed' && card ? (
                 <>
@@ -89,6 +109,17 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 13, color: '#888', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 14 },
   cardText: { fontSize: 36, color: '#111', fontWeight: '600', textAlign: 'center', lineHeight: 44 },
   actions: { alignItems: 'center', gap: 22 },
+  segmented: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#111',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  segment: { paddingHorizontal: 16, paddingVertical: 9 },
+  segmentActive: { backgroundColor: '#111' },
+  segmentText: { color: '#111', fontSize: 14, fontWeight: '600' },
+  segmentTextActive: { color: '#fff' },
   primary: {
     backgroundColor: '#111',
     paddingHorizontal: 44,
