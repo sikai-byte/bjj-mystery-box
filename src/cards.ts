@@ -1,6 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export type CardType = 'up' | 'down';
 
-export type Card = { type: CardType; text: string };
+export type Card = { id: string; type: CardType; text: string };
+
+export type Mode = 'up' | 'mix' | 'down';
 
 const POSITIONS: [up: string, down: string][] = [
   ['Start with a double leg', 'Partner starts with a double leg'],
@@ -17,15 +21,35 @@ const POSITIONS: [up: string, down: string][] = [
   ['Start in your guard', "Start in partner's guard"],
 ];
 
-export const CARDS: Card[] = POSITIONS.flatMap(([up, down]) => [
-  { type: 'up', text: up },
-  { type: 'down', text: down },
+export const DEFAULT_CARDS: Card[] = POSITIONS.flatMap(([up, down], i) => [
+  { id: `up-${i}`, type: 'up', text: up },
+  { id: `down-${i}`, type: 'down', text: down },
 ]);
 
-export type Mode = 'up' | 'mix' | 'down';
+const KEY = 'mystery-box:cards:v1';
 
-export function drawCard(previous: Card | null, mode: Mode = 'mix'): Card {
-  const deck = mode === 'mix' ? CARDS : CARDS.filter((c) => c.type === mode);
-  const pool = deck.length > 1 && previous ? deck.filter((c) => c.text !== previous.text) : deck;
+export async function loadCards(): Promise<Card[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as Card[];
+    }
+  } catch {}
+  return DEFAULT_CARDS;
+}
+
+export function saveCards(cards: Card[]): void {
+  void AsyncStorage.setItem(KEY, JSON.stringify(cards));
+}
+
+export function newId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function drawCard(cards: Card[], previous: Card | null, mode: Mode): Card | null {
+  const deck = mode === 'mix' ? cards : cards.filter((c) => c.type === mode);
+  if (deck.length === 0) return null;
+  const pool = deck.length > 1 && previous ? deck.filter((c) => c.id !== previous.id) : deck;
   return pool[Math.floor(Math.random() * pool.length)];
 }

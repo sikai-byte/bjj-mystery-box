@@ -1,12 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { Card, Mode, drawCard } from './src/cards';
+import { Card, DEFAULT_CARDS, Mode, drawCard, loadCards, saveCards } from './src/cards';
+import { CardsScreen } from './src/CardsScreen';
 import { Timer } from './src/Timer';
 
-type Phase = 'idle' | 'drawing' | 'revealed' | 'timer';
+type Phase = 'idle' | 'drawing' | 'revealed' | 'timer' | 'cards';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'up', label: 'Power-ups' },
@@ -18,6 +19,24 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [card, setCard] = useState<Card | null>(null);
   const [mode, setMode] = useState<Mode>('mix');
+  const [cards, setCards] = useState<Card[]>(DEFAULT_CARDS);
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+
+  useEffect(() => {
+    void loadCards().then(setCards);
+  }, []);
+
+  const changeCards = (next: Card[]) => {
+    setCards(next);
+    saveCards(next);
+  };
+
+  const closeCards = () => {
+    changeCards(cards.filter((c) => c.text.trim() !== ''));
+    setCard(null);
+    setPhase('idle');
+  };
   const fade = useRef(new Animated.Value(1)).current;
   const spin = useRef(new Animated.Value(0)).current;
 
@@ -35,7 +54,7 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setCard((prev) => drawCard(prev, mode));
+      setCard((prev) => drawCard(cardsRef.current, prev, mode));
       setPhase('revealed');
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
@@ -48,7 +67,9 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.root}>
-        {phase === 'timer' ? (
+        {phase === 'cards' ? (
+          <CardsScreen cards={cards} onChange={changeCards} onClose={closeCards} />
+        ) : phase === 'timer' ? (
           <Timer onClose={() => setPhase('idle')} />
         ) : (
           <View style={styles.center}>
@@ -74,10 +95,13 @@ export default function App() {
               ) : (
                 <Text style={styles.title}>Mystery Box</Text>
               )}
+              {phase === 'revealed' && !card && (
+                <Text style={styles.empty}>No cards in this mode — add some below.</Text>
+              )}
             </Animated.View>
 
             <View style={styles.actions}>
-              {phase === 'revealed' ? (
+              {phase === 'revealed' && card ? (
                 <>
                   <Pressable style={styles.primary} onPress={() => setPhase('timer')}>
                     <Text style={styles.primaryText}>Start timer</Text>
@@ -93,6 +117,9 @@ export default function App() {
                   </Animated.Text>
                 </Pressable>
               )}
+              <Pressable onPress={() => setPhase('cards')} hitSlop={10}>
+                <Text style={styles.subtle}>Edit cards ({cards.length})</Text>
+              </Pressable>
             </View>
           </View>
         )}
@@ -130,4 +157,6 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   link: { color: '#111', fontSize: 16, textDecorationLine: 'underline' },
+  subtle: { color: '#888', fontSize: 14, marginTop: 10 },
+  empty: { color: '#888', fontSize: 16, textAlign: 'center' },
 });
