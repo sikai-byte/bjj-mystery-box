@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Card, CardType, DEFAULT_CARDS, newCard } from './cards';
 import { EMOJIS, SOUNDS, isUri, playSound, soundLabel, toPersistentUri } from './media';
+import { GiphyPicker } from './GiphyPicker';
 
 type Props = {
   cards: Card[];
@@ -13,6 +14,7 @@ type Props = {
 
 export function CardsScreen({ cards, onChange, onClose }: Props) {
   const [open, setOpen] = useState<string | null>(null);
+  const [gifFor, setGifFor] = useState<string | null>(null);
 
   const patch = (id: string, p: Partial<Card>) =>
     onChange(cards.map((c) => (c.id === id ? { ...c, ...p } : c)));
@@ -80,8 +82,11 @@ export function CardsScreen({ cards, onChange, onClose }: Props) {
                   <Text style={styles.chipEmoji}>{e}</Text>
                 </Pressable>
               ))}
-              <Pressable onPress={() => void pickImage(c.id)} style={[styles.chip, isUri(c.image) && styles.chipActive]}>
-                <Text style={[styles.chipText, isUri(c.image) && styles.chipTextActive]}>Upload…</Text>
+              <Pressable onPress={() => setGifFor(c.id)} style={[styles.chip, isUri(c.image) && styles.chipActive]}>
+                <Text style={[styles.chipText, isUri(c.image) && styles.chipTextActive]}>GIF search…</Text>
+              </Pressable>
+              <Pressable onPress={() => void pickImage(c.id)} style={styles.chip}>
+                <Text style={styles.chipText}>Upload…</Text>
               </Pressable>
             </ScrollView>
             <Text style={styles.label}>Sound</Text>
@@ -120,6 +125,18 @@ export function CardsScreen({ cards, onChange, onClose }: Props) {
       </Pressable>
     </View>
   );
+
+  if (gifFor) {
+    return (
+      <GiphyPicker
+        onClose={() => setGifFor(null)}
+        onPick={(url) => {
+          patch(gifFor, { image: url });
+          setGifFor(null);
+        }}
+      />
+    );
+  }
 
   return (
     <View style={styles.root}>
