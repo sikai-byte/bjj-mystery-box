@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type CardType = 'up' | 'down';
 
-export type Card = { id: string; type: CardType; text: string; image: string; sound: string };
+export type Card = { id: string; type: CardType; text: string; image: string };
 
 export type Mode = 'up' | 'mix' | 'down';
 
@@ -22,8 +22,8 @@ const POSITIONS: [up: string, down: string, emoji: string][] = [
 ];
 
 export const DEFAULT_CARDS: Card[] = POSITIONS.flatMap(([up, down, emoji], i) => [
-  { id: `up-${i}`, type: 'up', text: up, image: emoji, sound: 'airhorn' },
-  { id: `down-${i}`, type: 'down', text: down, image: emoji, sound: 'trombone' },
+  { id: `up-${i}`, type: 'up', text: up, image: emoji },
+  { id: `down-${i}`, type: 'down', text: down, image: emoji },
 ]);
 
 export const newCard = (type: CardType): Card => ({
@@ -31,7 +31,6 @@ export const newCard = (type: CardType): Card => ({
   type,
   text: '',
   image: '🎲',
-  sound: type === 'up' ? 'airhorn' : 'trombone',
 });
 
 const KEY = 'mystery-box:cards:v2';

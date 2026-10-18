@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import { Card, CardType, DEFAULT_CARDS, newCard } from './cards';
-import { EMOJIS, SOUNDS, isUri, playSound, soundLabel, toPersistentUri } from './media';
+import { EMOJIS, isUri } from './media';
 import { GiphyPicker } from './GiphyPicker';
 
 type Props = {
@@ -33,14 +32,6 @@ export function CardsScreen({ cards, onChange, onClose }: Props) {
     patch(id, { image: a.base64 ? `data:${a.mimeType ?? 'image/jpeg'};base64,${a.base64}` : a.uri });
   };
 
-  const pickSound = async (id: string) => {
-    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
-    if (res.canceled) return;
-    const uri = await toPersistentUri(res.assets[0].uri);
-    patch(id, { sound: uri });
-    playSound(uri);
-  };
-
   const row = (c: Card) => {
     const expanded = open === c.id;
     return (
@@ -66,7 +57,7 @@ export function CardsScreen({ cards, onChange, onClose }: Props) {
         </View>
         <Pressable onPress={() => setOpen(expanded ? null : c.id)}>
           <Text style={styles.meta}>
-            {soundLabel(c.sound)} · {expanded ? 'close' : 'edit picture & sound'}
+            {expanded ? 'close' : 'edit picture'}
           </Text>
         </Pressable>
         {expanded && (
@@ -87,27 +78,6 @@ export function CardsScreen({ cards, onChange, onClose }: Props) {
               </Pressable>
               <Pressable onPress={() => void pickImage(c.id)} style={styles.chip}>
                 <Text style={styles.chipText}>Upload…</Text>
-              </Pressable>
-            </ScrollView>
-            <Text style={styles.label}>Sound</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {Object.entries(SOUNDS).map(([key, s]) => (
-                <Pressable
-                  key={key}
-                  onPress={() => {
-                    patch(c.id, { sound: key });
-                    playSound(key);
-                  }}
-                  style={[styles.chip, c.sound === key && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, c.sound === key && styles.chipTextActive]}>{s.label}</Text>
-                </Pressable>
-              ))}
-              <Pressable onPress={() => void pickSound(c.id)} style={[styles.chip, isUri(c.sound) && styles.chipActive]}>
-                <Text style={[styles.chipText, isUri(c.sound) && styles.chipTextActive]}>Upload…</Text>
-              </Pressable>
-              <Pressable onPress={() => patch(c.id, { sound: '' })} style={[styles.chip, !c.sound && styles.chipActive]}>
-                <Text style={[styles.chipText, !c.sound && styles.chipTextActive]}>None</Text>
               </Pressable>
             </ScrollView>
           </View>

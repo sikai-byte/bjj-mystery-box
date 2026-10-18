@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { Card, DEFAULT_CARDS, Mode, drawCard, loadCards, saveCards } from './src/cards';
 import { CardsScreen } from './src/CardsScreen';
-import { isUri, playSound } from './src/media';
+import { isUri } from './src/media';
 import { Timer } from './src/Timer';
 
 type Phase = 'idle' | 'drawing' | 'revealed' | 'timer' | 'cards';
@@ -57,7 +57,6 @@ export default function App() {
     ]).start(() => {
       const next = drawCard(cardsRef.current, card, mode);
       setCard(next);
-      if (next) playSound(next.sound);
       setPhase('revealed');
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
